@@ -11,7 +11,7 @@
   log-cs4500-f18-error
   log-cs4500-f18-fatal
   ;;
-  harness-exe-path staff-exe-path staff-tests-path student-exe-name student-test-name
+  harness-exe-path staff-server-path staff-client-path staff-tests-path student-server-name student-client-name student-test-name
   student-root student-deadline assignment-name max-seconds team-name*
   student-test-num
   ;;
@@ -82,15 +82,17 @@
   (begin (define x 'x) ...))
 
 (define-symbol*
-  harness-exe-path staff-exe-path staff-tests-path student-exe-name student-test-name
+  harness-exe-path staff-server-path staff-client-path staff-tests-path student-server-name student-client-name student-test-name
   student-root student-deadline assignment-name max-seconds team-name*
   student-test-num)
 
 (define fest-config-key/c
   (or/c harness-exe-path
-        staff-exe-path
+        staff-server-path
+        staff-client-path
         staff-tests-path
-        student-exe-name
+        student-server-name
+        student-client-name
         student-test-name
         student-test-num
         student-root
@@ -108,11 +110,15 @@
   (case k
     ((harness-exe-path)
      complete-path-to-file/c)
-    ((staff-exe-path)
+    ((staff-server-path)
+     complete-path-to-file/c)
+    ((staff-client-path)
      complete-path-to-file/c)
     ((staff-tests-path)
      complete-path-to-directory/c)
-    ((student-exe-name)
+    ((student-server-name)
+     (and/c path-string? relative-path?))
+    ((student-client-name)
      (and/c path-string? relative-path?))
     ((student-test-name)
      (and/c path-string? relative-path?))
@@ -131,7 +137,7 @@
 
 (define fest-config/c
   (lambda (h)
-    (for ((k (in-list (list harness-exe-path staff-exe-path staff-tests-path student-exe-name student-test-name student-root student-deadline assignment-name team-name*))))
+    (for ((k (in-list (list harness-exe-path staff-server-path staff-client-path staff-tests-path student-server-name student-client-name student-test-name student-root student-deadline assignment-name team-name*))))
       (unless (hash-has-key? h k)
         (raise-arguments-error 'fest-config/c "missing key" "key" k "hash" h))
       (define v (hash-ref h k))

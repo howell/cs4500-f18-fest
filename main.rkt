@@ -37,14 +37,14 @@
   (define results-dir (init-fest cfg))
   (define r-str (path-string->string results-dir))
   (void
-    (log-cs4500-f18-info "running student executable ('~a')  vs. staff tests ('~a')" (hash-ref cfg student-exe-name) (hash-ref cfg staff-tests-path))
-    (student-exe-vs-staff-test results-dir cfg)
+    (log-cs4500-f18-info "running staff server ('~a')  vs. student clients ('~a')" (hash-ref cfg staff-server-path) (hash-ref cfg student-client-name))
+    (staff-server-vs-student-client results-dir cfg)
     #;(ask-for-help "finished checking student exe vs. staff tests --- does everything look okay in '~a'?~nPress enter to continue." r-str)
-    (log-cs4500-f18-info "running staff executable ('~a') vs. student tests ('~a')" (hash-ref cfg staff-exe-path) (hash-ref cfg student-test-name))
-    (staff-exe-vs-student-test results-dir cfg)
+    (log-cs4500-f18-info "running student server ('~a') vs. staff clients ('~a')" (hash-ref cfg student-client-name) (hash-ref cfg staff-client-path))
+    (student-server-vs-staff-client results-dir cfg)
     #;(ask-for-help "finished checking staff exe vs. student tests --- does everything look okay in '~a'?~nPress enter to continue." r-str)
-    (log-cs4500-f18-info "running TESTFEST for '~a'" (path-string->string results-dir))
-    (fest-matrix results-dir cfg))
+    #;(log-cs4500-f18-info "running TESTFEST for '~a'" (path-string->string results-dir))
+    #;(fest-matrix results-dir cfg))
   (log-cs4500-f18-info "testfest complete, results in: '~a'" (path-string->string results-dir))
   (void))
 
@@ -163,13 +163,14 @@
                                            (,assignment-name . C))))
                   (build-path "A/B" "C"))))
 
-(define (student-exe-vs-staff-test results-dir cfg)
+(define (staff-server-vs-student-client results-dir cfg)
   ;; for every team name, if haven't run staff tests yet,
   ;;  check that exe exists + is executable,
   ;;  run MF tests, save to file
   ;;  stop and print the process list in-between
   (define s-root (hash-ref cfg student-root))
-  (define s-exe-name (hash-ref cfg student-exe-name))
+  (define s-exe-name (hash-ref cfg student-client-name))
+  (define staff-server (hash-ref cfg staff-server-path))
   (define staff-tests (hash-ref cfg staff-tests-path))
   (define *first-time (box #true))
   (define exe-time-limit (or (hash-ref cfg max-seconds) MAX-EXE-SECONDS))
@@ -221,7 +222,7 @@
          (define r-str
            (parameterize ((current-directory (path-only team-exe)))
              (call-with-cs4500-limits exe-time-limit MAX-MB
-               (lambda () (run-staff-harness cfg #:exe team-exe #:tests staff-tests)))))
+               (lambda () (run-staff-harness cfg #:server staff-server #:client team-exe #:tests staff-tests)))))
          (write-team-output r-str)
          (log-cs4500-f18-warning "finished executing for '~a', current ps -f:~n~a~noutput:~a"
                                  (path->string team-exe)
@@ -231,81 +232,80 @@
          (void)])))
   (void))
 
-(define (staff-exe-vs-student-test results-dir cfg)
-  ;; for every team name,
-  ;;  find their tests if any,
-  ;;  run the staff exe on each test ONE BY ONE, check for "PASSED"
-  ;;  concat the outputs into one file,
-  ;;  save valid tests into results dir
-  (define name* (hash-ref cfg team-name*))
-  (define staff-exe (hash-ref cfg staff-exe-path))
-  (define test-path (hash-ref cfg student-test-name))
-  (define test-name (path-string->string (file-name-from-path test-path)))
+(define (student-server-vs-staff-client results-dir cfg)
+  ;; for every team name, if haven't run staff tests yet,
+  ;;  check that exe exists + is executable,
+  ;;  run MF tests, save to file
+  ;;  stop and print the process list in-between
   (define s-root (hash-ref cfg student-root))
-  (define num-tests (hash-ref cfg student-test-num))
-  (define test-time-limit (or (hash-ref cfg max-seconds) MAX-TEST-SECONDS))
-  (log-cs4500-f18-info "test-time-limit: ~a" test-time-limit)
-  (define passing 0)
-  (define failing 0)
-  (for ((this-name-sym (in-list name*)))
+  (define s-exe-name (hash-ref cfg student-server-name))
+  (define staff-client (hash-ref cfg staff-client-path))
+  (define staff-tests (hash-ref cfg staff-tests-path))
+  (define *first-time (box #true))
+  (define exe-time-limit (or (hash-ref cfg max-seconds) MAX-EXE-SECONDS))
+  (define assn-name-str (~a (hash-ref cfg assignment-name)))
+  (for ((this-name-sym (in-list (hash-ref cfg team-name*))))
     (define this-name-str (symbol->string this-name-sym))
-    (define this-r (build-path results-dir this-name-str))
-    (define this-r-test (build-path this-r test-name))
-    (unless (directory-exists? this-r-test)
-      (make-directory this-r-test)
-      (define this-tests (build-path s-root this-name-str test-path))
-      (ensure-dir this-tests)
-      (define expected-files (for*/set ([i (in-range num-tests)]
-                                        [in? (in-list '(#t #f))])
-                               (if in? (i-in.json i) (i-out.json i))))
-      (define actual-in-dir (for/set ([p (in-list (directory-list this-tests))]) (path->string p)))
-      (unless (equal? expected-files actual-in-dir)
-        (log-cs4500-f18-info "Extra/Missing test files for ~a" this-name-str)
-        (with-output-to-file (build-path this-r AUDIT.txt) #:exists 'append
-          (lambda () (printf "Extra or missing files in tests directory\n"))))
-      (for* ([i (in-range num-tests)]
-             [test.in (in-value (build-path this-tests (format "~a-in.json" i)))]
-             #:when (let ((out.json (in.json->out.json test.in)))
-                      (and (file-exists? test.in)
-                           (file-exists? out.json))))
-        (log-cs4500-f18-info "auditing test '~a'" (path-string->string test.in))
-        (define test.out (in.json->out.json test.in))
-        (if (file-too-large? test.out)
-          (with-output-to-file (build-path this-r AUDIT.txt) #:exists 'append
-            (lambda () (printf "file ~s is too large (~a bytes)~n" (path-string->string test.in) (file-size test.in))))
-          (let ()
-            #;(log-cs4500-f18-info "Starting search for tmp-dir")
-            (define tmp-dir
-              (let loop ((acc this-tests))
-                #;(log-cs4500-f18-info "checking ~a" acc)
-                (if (directory-exists? acc)
-                  (loop (path-add-extension acc (format "-~a" i)))
-                  acc)))
-            #;(log-cs4500-f18-info "Found temp dir ~a" tmp-dir)
-            (void
-              (make-directory tmp-dir)
-              (copy-file test.in (build-path tmp-dir (file-name-from-path test.in)))
-              (copy-file test.out (build-path tmp-dir (file-name-from-path test.out))))
-            (define r-str
-              (parameterize ((current-directory (path-only staff-exe)))
-                (log-cs4500-f18-info "invoking staff exe on ~a" test.in)
-                (call-with-cs4500-limits 20 #;test-time-limit 100
-                  (lambda () (run-staff-harness cfg #:exe staff-exe #:tests tmp-dir)))))
-            (cond
-              [(student-test-passed? r-str)
-               (log-cs4500-f18-info "good test! '~a'" (path-string->string test.in))
-               (set! passing (add1 passing))
-               (copy-file test.in (build-path this-r-test (file-name-from-path test.in)))
-               (copy-file test.out (build-path this-r-test (file-name-from-path test.out)))]
-              [else
-               (set! failing (add1 failing))
-               (log-cs4500-f18-info "bad test! '~a'" (path-string->string test.in))])
-            (with-output-to-file (build-path this-r AUDIT.txt) #:exists 'append
-              (lambda () (displayln r-str)))
-            (delete-directory/files tmp-dir)
-            (void))))))
-  (log-cs4500-f18-warning "\n\n\nTest Audit: ~a passed, ~a failed\n\n\n" passing failing)
-  (void))
+    (define team-r-dir (build-path results-dir this-name-str))
+    (void (ensure-dir team-r-dir))
+    (define team-make-file (build-path s-root this-name-str assn-name-str "makefile"))
+    (define team-Make-file (build-path s-root this-name-str assn-name-str "Makefile"))
+    (define prev-make.txt (build-path s-root this-name-str assn-name-str "make.txt"))
+    (define make-path (build-path team-r-dir "make.txt"))
+    (when (file-exists? prev-make.txt)
+      (log-cs4500-f18-info "Moving vet make results for ~a" this-name-str)
+      (copy-file prev-make.txt (build-path team-r-dir "first-make.txt") #t)
+      (delete-file prev-make.txt))
+    (define already-made? (file-exists? make-path))
+    (when (and (not already-made?)
+               (or (file-exists? team-make-file) (file-exists? team-Make-file)))
+      (log-cs4500-f18-warning "about to run student Makefile, current ps -f:~n~a" (current-process-list))
+      (define custodian (make-custodian))
+      (parameterize ((current-custodian custodian)
+                     (current-subprocess-custodian-mode 'kill)
+                     (subprocess-group-enabled
+
+          (parameterize ((current-directory (path-only team-make-file)))
+            (define MAKE-TIMEOUT (* 20 60))
+            (define m-str
+              (with-handlers ([exn:fail:resource? (lambda (exn) "Took longer than ~a seconds" MAKE-TIMEOUT)])
+                (call-with-limits MAKE-TIMEOUT #f
+                                  (lambda () (shell/dontstop "make" (list))))))
+            (with-output-to-file (build-path team-r-dir "make.txt") (lambda () (displayln m-str)))
+            (custodian-shutdown-all custodian))))
+    (define team-mf (build-path team-r-dir AUDIT.txt))
+    (unless (file-exists? team-mf)
+      (when (unbox *first-time)
+        (set-box! *first-time #false)
+        (log-cs4500-f18-warning "about to test student executables, current ps -f:~n~a" (current-process-list)))
+      (define (write-team-output str)
+        (with-output-to-file team-mf #:exists 'append (lambda () (displayln str))))
+      (define team-exe (build-path s-root this-name-str s-exe-name))
+      (cond
+        [(not (file-exists? team-exe))
+         (write-team-output (format "file '~a' does not exist" (path->string team-exe)))]
+        [(not (file-executable? team-exe))
+         (write-team-output (format "file '~a' is not executable" (path->string team-exe)))]
+        [else
+         (log-cs4500-f18-warning "executing ~a" (path->string team-exe))
+         (define r-str
+           (parameterize ((current-directory (path-only team-exe)))
+             (call-with-cs4500-limits exe-time-limit MAX-MB
+               (lambda () (run-staff-harness cfg #:server s-exe-name #:client staff-client #:tests staff-tests)))))
+         (write-team-output r-str)
+         (define bonus-tests (build-path staff-tests "../" "BonusTests"))
+         (define bonus-r-str
+           (parameterize ((current-directory (path-only team-exe)))
+             (call-with-cs4500-limits exe-time-limit MAX-MB
+                                      (lambda () (run-staff-harness cfg #:server s-exe-name #:client staff-client #:tests bonus-tests #:bonus? #t)))))
+         (write-team-output bonus-r-str)
+         (log-cs4500-f18-warning "finished executing for '~a', current ps -f:~n~a~noutput:~a"
+                                 (path->string team-exe)
+                                 (current-process-list)
+                                 r-str)
+         #;(ask-for-help "Press enter to continue")
+         (void)])))
+  (void))))
 
 (define (file-too-large? ps)
   (< MAX-FILE-BYTES (file-size ps)))
@@ -346,7 +346,7 @@
 (define (student-test-passed? str)
   (regexp-match? #rx"passed 1" str))
 
-(define (fest-matrix results-dir cfg)
+#;(define (fest-matrix results-dir cfg)
   ;; for every team with a "valid" executable,
   ;;  for every OTHER team with valid tests,
   ;;   run team-exe on OTHER-team-tests,
@@ -383,13 +383,14 @@
 (define (current-process-list)
   (shell/dontstop "ps" "-f"))
 
-(define (run-staff-harness cfg #:exe exe-path #:tests tests-path)
+(define (run-staff-harness cfg #:server server-path #:client client-path #:tests tests-path #:bonus? [bonus? #f])
   (define h-exe (hash-ref cfg harness-exe-path))
   (define cc (make-custodian))
   (begin0
     (parameterize ((current-custodian cc)
                    (current-subprocess-custodian-mode 'kill))
-        (shell/dontstop h-exe (list tests-path exe-path)))
+        (shell/dontstop h-exe (list* tests-path client-path server-path
+                                     (if bonus? '("--bonus") '()))))
     (custodian-shutdown-all cc)))
 
 (define (make-tests-dir team-name results-dir cfg)
@@ -402,7 +403,7 @@
        (directory-exists? ps)
        (not (null? (directory-list ps)))))
 
-(define (has-valid-testfest-exe? team-name results-dir cfg)
+#;(define (has-valid-testfest-exe? team-name results-dir cfg)
   (define exe-path (build-path (hash-ref cfg student-root) (~a team-name) (hash-ref cfg student-exe-name)))
   (and (file-exists? exe-path)
        (file-executable? exe-path)))
