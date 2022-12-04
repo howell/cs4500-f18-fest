@@ -264,7 +264,7 @@
       (parameterize ((current-custodian custodian)
                      (current-subprocess-custodian-mode 'kill)
                      (subprocess-group-enabled
-
+                      (or (eq? (system-type) 'unix) (eq? (system-type) 'macosx))))
           (parameterize ((current-directory (path-only team-make-file)))
             (define MAKE-TIMEOUT (* 20 60))
             (define m-str
@@ -305,7 +305,7 @@
                                  r-str)
          #;(ask-for-help "Press enter to continue")
          (void)])))
-  (void))))
+  (void))
 
 (define (file-too-large? ps)
   (< MAX-FILE-BYTES (file-size ps)))
