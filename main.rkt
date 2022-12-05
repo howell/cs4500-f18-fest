@@ -291,13 +291,13 @@
          (define r-str
            (parameterize ((current-directory (path-only team-exe)))
              (call-with-cs4500-limits exe-time-limit MAX-MB
-               (lambda () (run-staff-harness cfg #:server s-exe-name #:client staff-client #:tests staff-tests)))))
+               (lambda () (run-staff-harness cfg #:server team-exe #:client staff-client #:tests staff-tests)))))
          (write-team-output r-str)
          (define bonus-tests (build-path staff-tests "../" "BonusTests"))
          (define bonus-r-str
            (parameterize ((current-directory (path-only team-exe)))
              (call-with-cs4500-limits exe-time-limit MAX-MB
-                                      (lambda () (run-staff-harness cfg #:server s-exe-name #:client staff-client #:tests bonus-tests #:bonus? #t)))))
+                                      (lambda () (run-staff-harness cfg #:server team-exe #:client staff-client #:tests bonus-tests #:bonus? #t)))))
          (write-team-output bonus-r-str)
          (log-cs4500-f18-warning "finished executing for '~a', current ps -f:~n~a~noutput:~a"
                                  (path->string team-exe)
