@@ -212,7 +212,8 @@
         (set-box! *first-time #false)
         (log-cs4500-f18-warning "about to test student executables, current ps -f:~n~a" (current-process-list)))
       (define (write-team-output str)
-        (with-output-to-file team-mf (lambda () (displayln str))))
+        (with-output-to-file team-mf #:exists 'append
+          (lambda () (displayln str))))
       (define team-exe (build-path s-root this-name-str s-exe-name))
       (cond
         [(not (file-exists? team-exe))
