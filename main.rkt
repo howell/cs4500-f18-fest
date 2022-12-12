@@ -337,6 +337,7 @@
   (for ((this-name-sym (in-list name*)))
     (define this-name-str (symbol->string this-name-sym))
     (define this-r (build-path results-dir this-name-str))
+    (ensure-dir this-r)
     (define this-r-test (build-path this-r test-name))
     (unless (directory-exists? this-r-test)
       (make-directory this-r-test)
