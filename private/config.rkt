@@ -25,6 +25,8 @@
     [MAX-FILE-BYTES exact-nonnegative-integer?]
     [MF.txt string?]
     [AUDIT.txt string?]
+    [STAFF-SERVER.txt string?]
+    [STUDENT-SERVER.txt string?]
     [cs4500-f18-logger
      logger?]
     [complete-path-to-file/c
@@ -60,6 +62,8 @@
 
 (define MF.txt "MF.txt")
 (define AUDIT.txt "audit.txt")
+(define STAFF-SERVER.txt "staff-server-student-clients.txt")
+(define STUDENT-SERVER.txt "student-server-staff-clients.txt")
 (define MAX-EXE-SECONDS 60)
 (define MAX-TEST-SECONDS 10)
 (define MAX-MB (expt 2 10))
