@@ -378,7 +378,7 @@
               (parameterize ((current-directory (path-only staff-server)))
                 (log-cs4500-f18-info "invoking staff exe on ~a" test.in)
                 (call-with-cs4500-limits 20 #;test-time-limit 100
-                  (lambda () (run-staff-harness cfg #:serrver staff-server #:client staff-client #:tests tmp-dir)))))
+                  (lambda () (run-staff-harness cfg #:server staff-server #:client staff-client #:tests tmp-dir)))))
             (cond
               [(student-test-passed? r-str)
                (log-cs4500-f18-info "good test! '~a'" (path-string->string test.in))
