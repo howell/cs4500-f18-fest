@@ -293,7 +293,7 @@
              (call-with-cs4500-limits exe-time-limit MAX-MB
                (lambda () (run-staff-harness cfg #:server team-exe #:client staff-client #:tests staff-tests)))))
          (write-team-output r-str)
-         (define bonus-tests (build-path staff-tests "../" "BonusTests"))
+         (define bonus-tests (build-path staff-tests "../" "JBonusTests"))
          (define bonus-r-str
            (parameterize ((current-directory (path-only team-exe)))
              (call-with-cs4500-limits exe-time-limit MAX-MB
